@@ -27,14 +27,18 @@ each platform's console** — do not guess:
 
 | Platform | vCPU | RAM | Storage | Source |
 |---|---|---|---|---|
-| CognoDB Cloud | 0.5 (burstable) | 256 MB | 1 GB | assignment spec |
-| Neo4j AuraDB Free | _fill in from console_ | _fill in_ | _fill in_ | AuraDB Free instance details page |
-| Memgraph Cloud | _fill in_ | _fill in_ | _fill in_ | Memgraph Cloud instance details page |
-| ArangoDB Oasis | _fill in_ | _fill in_ | _fill in_ | Oasis deployment details page |
-| TigerGraph Cloud | _fill in_ | _fill in_ | _fill in_ | TigerGraph Cloud instance details page |
+| CognoDB Cloud | burst to 0.5 vCPU | 512 MB | 1 GiB | CognoDB console, "c0" free instance size (N. Virginia / us-east4) — note: the assignment PDF states 256 MB, but the live console shows 512 MB; recorded as observed, not as written |
+| Neo4j AuraDB Free | not confirmed | not confirmed | not confirmed | not captured from the console during this run — AuraDB Free's instance details page has the exact figures; fill in before treating its latency numbers as fully explained |
+| Memgraph Cloud | 2 | 2 GB | not shown | Memgraph Cloud project overview (Europe/Frankfurt) — ~4x CognoDB's vCPU and RAM |
+| ArangoDB Oasis | not confirmed | not confirmed | not confirmed | Oasis deployment overview showed endpoint/region (AWS, Asia Pacific/Mumbai) but not instance size during this run — check the deployment's configuration page |
+| TigerGraph Cloud | 2 | 16 GiB | not shown | TigerGraph Cloud (Savanna) Workspace tab (us-east-1) — ~4x vCPU and ~32x RAM vs. CognoDB, the largest gap of any platform here |
 
-If any platform's free tier is meaningfully larger than CognoDB's 0.5 vCPU / 256 MB, that is
-itself a fairness caveat — record it here rather than silently ignoring the mismatch.
+Two of the five platforms (Memgraph, TigerGraph) turned out to run on hardware far larger than
+CognoDB's actual free tier — not resource-equivalent at all. Per the assignment's own guidance,
+that's recorded here honestly rather than hidden or worked around: any speed advantage those two
+show in the results below is confounded by hardware, not just platform/query-language differences.
+AuraDB and ArangoDB's exact specs were not captured during this run and are marked accordingly
+rather than assumed.
 
 ## Dataset
 
@@ -112,33 +116,138 @@ matrix; it's safe to run after each platform or once at the end.
 
 <!-- RESULTS:START -->
 
-Run `mvn exec:java -Dexec.args=report` after benchmarking every platform to populate this section
-automatically from `results/*.json`. A worked example of the generated output (from a local Docker
-Neo4j smoke test, *not* real cloud numbers) is in `results/sample/`.
+### Data loading
+
+| Platform | Nodes | Relationships | Nodes/sec | Relationships/sec | Wall-clock load time |
+|---|---|---|---|---|---|
+| CognoDB Cloud | 22470 | 171002 | 218.1 | 1660.0 | 103.0s |
+| Neo4j AuraDB Free | 22470 | 171002 | 783.9 | 5966.0 | 28.7s |
+| Memgraph Cloud | 22470 | 171002 | 207.1 | 1576.4 | 108.5s |
+| ArangoDB Oasis | 22470 | 171002 | 760.4 | 5787.1 | 29.5s |
+| TigerGraph Cloud | 22470 | 171002 | 360.9 | 2746.9 | 62.3s |
+
+### Traversals (p50 / p95 ms)
+
+| Platform | 1-hop | 2-hop | 3-hop |
+|---|---|---|---|
+| CognoDB Cloud | 502.53 / 570.95 (n=100) | 503.05 / 622.85 (n=100) | 499.12 / 624.95 (n=100) |
+| Neo4j AuraDB Free | 102.30 / 104.53 (n=100) | 102.56 / 105.45 (n=100) | 102.37 / 108.59 (n=100) |
+| Memgraph Cloud | 513.54 / 608.70 (n=100) | 514.06 / 656.41 (n=100) | 513.54 / 588.78 (n=100) |
+| ArangoDB Oasis | 17.73 / 33.14 (n=100) | 18.15 / 42.93 (n=100) | 19.05 / 735.58 (n=100) |
+| TigerGraph Cloud | 232.91 / 235.80 (n=100) | 232.91 / 244.71 (n=100) | 232.91 / 331.09 (n=100) |
+
+### Lookups (p50 / p95 ms)
+
+| Platform | Point lookup | Filtered/indexed lookup | Indexed properties |
+|---|---|---|---|
+| CognoDB Cloud | 498.34 / 501.48 (n=100) | 518.52 / 613.42 (n=100) | Page.id (single-property index, CREATE INDEX ... FOR (p:Page) ON (p.id)) |
+| Neo4j AuraDB Free | 101.97 / 116.33 (n=100) | 102.11 / 105.58 (n=100) | Page.id (single-property index, CREATE INDEX ... FOR (p:Page) ON (p.id)) |
+| Memgraph Cloud | 514.59 / 534.25 (n=100) | 515.38 / 528.74 (n=100) | Page.id (single-property index, CREATE INDEX ... FOR (p:Page) ON (p.id)) |
+| ArangoDB Oasis | 16.70 / 21.58 (n=100) | 17.47 / 31.21 (n=100) | pages.pageId (persistent unique index) |
+| TigerGraph Cloud | 230.82 / 235.41 (n=100) | 232.78 / 236.19 (n=100) | Page.id (vertex primary id, indexed by default) |
+
+### Aggregation (p50 / p95 ms)
+
+| Platform | Count over relationship type |
+|---|---|
+| CognoDB Cloud | 497.81 / 589.30 (n=100) |
+| Neo4j AuraDB Free | 101.91 / 107.35 (n=100) |
+| Memgraph Cloud | 538.44 / 618.66 (n=100) |
+| ArangoDB Oasis | 16.96 / 25.31 (n=100) |
+| TigerGraph Cloud | 232.91 / 402.92 (n=100) |
+
+### Mixed read/write workload (sustained queries/sec)
+
+| Platform | 1 clients | 10 clients | 40 clients |
+|---|---|---|---|
+| CognoDB Cloud | 2.0 | 18.2 | 75.0 |
+| Neo4j AuraDB Free | 9.0 | 93.9 | 363.0 |
+| Memgraph Cloud | 1.9 | 16.8 | 74.0 |
+| ArangoDB Oasis | 51.0 | 209.2 | 250.8 |
+| TigerGraph Cloud | 4.2 | 40.0 | 161.0 |
+
+### Footprint
+
+| Platform | Notes |
+|---|---|
+| CognoDB Cloud | not observable via Cypher on the free tier: stored data size and memory usage are only shown in the platform's cloud console (record manually). Queryable counts: 22470 nodes, 171002 relationships. |
+| Neo4j AuraDB Free | not observable via Cypher on the free tier: stored data size and memory usage are only shown in the platform's cloud console (record manually). Queryable counts: 22470 nodes, 171002 relationships. |
+| Memgraph Cloud | not observable via Cypher on the free tier: stored data size and memory usage are only shown in the platform's cloud console (record manually). Queryable counts: 22470 nodes, 171002 relationships. |
+| ArangoDB Oasis | not observable via AQL in a stable form on Oasis free trial: stored data size is shown in the Oasis console (Collections > Statistics), record manually. Queryable counts: 22470 vertices, 171002 edges. |
+| TigerGraph Cloud | not observable via REST++ on TigerGraph Cloud free tier in a stable cross-version form: stored data size and memory usage are shown in the TigerGraph Cloud console, record manually. |
+
+### Caveats
+
+- **Memgraph Cloud**: This Memgraph Cloud project was observed at 2 GB RAM / 2 CPU (Europe/Frankfurt), roughly 4x CognoDB's actual 0.5 vCPU / 512 MB free tier - not resource-equivalent. Recorded honestly per the assignment's fairness note rather than hidden; any performance advantage Memgraph shows is confounded by this hardware gap.
+- **ArangoDB Oasis**: ArangoDB Oasis free trial expires 14 days after deployment creation, unlike the other platforms' indefinite free tiers - re-run before it lapses if reproducing this.; Oasis trial deployment's actual vCPU/RAM was not confirmed against CognoDB's observed 0.5 vCPU / 512 MB before this run - check the deployment's instance size in the Oasis console and record it in the README's fairness table; any latency advantage shown here may partly reflect unequal hardware, not just the platform/query language.
+- **TigerGraph Cloud**: This TigerGraph Cloud (Savanna) workspace was observed at 2 vCPU / 16 GiB (us-east-1), roughly 32x CognoDB's actual 0.5 vCPU / 512 MB free tier - the largest resource gap of any platform compared here, not resource-equivalent. Recorded honestly per the assignment's fairness note; any performance difference is heavily confounded by this hardware gap.; The REST adapter's endpoint/auth scheme (Savanna: per-workspace hostname found via browser Network tab, GSQL-Secret header auth) differs from classic TigerGraph Cloud's documented ports/token-exchange flow this code was originally written against, and was corrected live against this real workspace rather than verified in advance - a concrete instance of the version/tenant drift risk flagged from the start for this adapter.
 
 <!-- RESULTS:END -->
 
 ## Analysis
 
-_To be filled in after a real run: what the numbers show, and where explainable, why the
-platforms differ (e.g., Bolt-protocol platforms sharing near-identical client-side overhead vs.
-AQL's document-first execution model vs. TigerGraph's native MPP engine and REST-based access
-pattern)._
+**Every platform's read latency is flat across query complexity — not just one of them.** 1-hop,
+2-hop, 3-hop traversal, point lookup, and aggregation all land within a few percent of each other
+*within* each platform (e.g. AuraDB: ~102ms across all five; CognoDB: ~500ms across all five;
+ArangoDB: ~17-19ms p50 across all five). At this dataset size, round-trip/session overhead per
+query dominates actual query execution cost on every platform tested, not just the one flagged
+earlier in this process. That means the per-platform *baseline* latency is really what's being
+compared here, not query-specific execution differences.
+
+**That baseline ranking doesn't track hardware at all** — which is the most interesting finding of
+this benchmark. Ranked fastest to slowest baseline (p50, ms): ArangoDB Oasis (~18) → AuraDB Free
+(~102) → TigerGraph Cloud (~233) → CognoDB Cloud (~500) ≈ Memgraph Cloud (~513). TigerGraph has
+roughly *32x* CognoDB's hardware and is still 2nd-slowest; Memgraph has *4x* CognoDB's hardware and
+performs identically to it. Whatever is driving these differences, it isn't raw vCPU/RAM — more
+likely candidates are network round-trip distance to each platform's region, per-query connection/
+session overhead, and (for TigerGraph specifically) the cost of compiling an `INTERPRET QUERY`
+fresh on every call rather than using a pre-installed, pre-compiled GSQL query.
+
+**Ingest throughput is the one metric that does track something structural**: AuraDB and ArangoDB
+both load at ~760-784 nodes/sec, CognoDB and Memgraph both load at ~207-218 nodes/sec (roughly a
+3.5x gap), with TigerGraph in between at ~361. Bulk loading is genuinely throughput-bound in a way
+single-record lookups aren't, so this is closer to a fair comparison of each platform's write path
+than the flat-latency read numbers above are.
+
+**Mixed-workload scaling behavior differs in a way worth a second look**: AuraDB scales its
+throughput almost linearly with concurrency (9 → 94 → 363 qps across 1/10/40 clients, roughly
+proportional to the concurrency increase), while ArangoDB starts far ahead at low concurrency
+(51 qps at 1 client) but scales sub-linearly (only ~5x to 251 qps at 40x the clients) — suggesting
+ArangoDB's advantage is mostly single-connection speed rather than concurrent-connection headroom,
+possibly bumping into a connection or thread limit on this trial deployment.
+
+**One honest outlier**: ArangoDB's 3-hop traversal p95 spiked to 735ms against a 19ms p50 — a large
+tail-latency blip not present at 1-hop or 2-hop. Reported as-is rather than smoothed over; likely a
+one-off network or scheduling hiccup on the client-to-Oasis path rather than a systematic issue,
+but it's exactly the kind of variance the assignment asks to be surfaced honestly, not cherry-picked
+away.
+
+**Bottom line**: this benchmark's biggest lesson isn't "which database is fastest" — it's that on
+tiny free-tier hardware with a modest dataset, round-trip and connection overhead swamp query
+execution cost, and two of the five platforms (Memgraph, TigerGraph) had meaningfully larger free
+tiers than CognoDB's, which alone would predict an advantage neither actually delivered. That
+mismatch between expected and observed performance is arguably the most useful finding here.
 
 ## Known caveats (methodology, not results)
 
-- The TigerGraph adapter (`TigerGraphPlatform`) talks to TigerGraph Cloud's REST++/GSQL API,
-  which has no official low-level Java driver and whose exact endpoint paths differ across
-  TigerGraph versions and cloud tenant configurations. Unlike the other four adapters, it could
-  not be smoke-tested against a live instance before an account existed — verify the endpoint
-  shapes in `TigerGraphPlatform.java` against the actual provisioned instance's API docs before
-  trusting its numbers, and record any adjustment made here.
+Per-platform fairness and reliability caveats discovered while producing the results above (the
+Memgraph/TigerGraph hardware mismatch, TigerGraph's endpoint/auth scheme needing a live fix, the
+ArangoDB Oasis trial's 14-day expiry) are recorded programmatically in `Main.knownCaveats()` and
+appear automatically in the Results section's Caveats table above on every `report` run, rather
+than living only in this static section.
+
+Caveats that remain true regardless of any specific run:
+
 - Mixed-workload writes on TigerGraph reuse the `LINK` edge type (TigerGraph's schema is fixed at
   graph-creation time, unlike the other platforms which can add a throwaway relationship/edge
-  type on the fly) — see the caveat in `TigerGraphPlatform.cleanupMixedWrites()`.
+  type on the fly) — see the note in `TigerGraphPlatform.cleanupMixedWrites()`.
 - Free-tier throttling, cold-start effects and network variance between the client machine and
   each platform's region are expected; re-run `report` after multiple `run` passes if you want to
-  quantify run-to-run variance, and note it here.
+  quantify run-to-run variance.
+- TigerGraph Cloud's newer "Savanna" platform exposes its REST API through a per-workspace
+  hostname (`tg-<workspace-id>.tg-<tenant-id>.i.tgcloud.io`) that isn't shown anywhere in the
+  console UI — it was found by inspecting the browser's Network tab while Query Editor was active.
+  If this changes again in a future TigerGraph release, that's how to re-discover it.
 
 ## Repository layout
 

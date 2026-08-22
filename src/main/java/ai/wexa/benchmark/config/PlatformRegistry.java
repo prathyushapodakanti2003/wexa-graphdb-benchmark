@@ -32,7 +32,7 @@ public final class PlatformRegistry {
                     require("ARANGO_URI"), require("ARANGO_USER"), require("ARANGO_PASSWORD"),
                     dotenv.get("ARANGO_DATABASE", "benchmark"));
             case "tigergraph" -> new TigerGraphPlatform(
-                    require("TIGERGRAPH_HOST"), require("TIGERGRAPH_USER"), require("TIGERGRAPH_PASSWORD"),
+                    require("TIGERGRAPH_HOST"), require("TIGERGRAPH_SECRET"),
                     dotenv.get("TIGERGRAPH_GRAPH", "benchmark"));
             default -> throw new IllegalArgumentException(
                     "Unknown platform key '" + key + "', expected one of " + ALL_PLATFORM_KEYS);

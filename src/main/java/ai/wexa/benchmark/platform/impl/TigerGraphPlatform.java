@@ -16,34 +16,38 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Talks to TigerGraph Cloud over its REST++ API. TigerGraph has no official
- * low-level Java driver, and its REST endpoint paths / auth flow differ
- * across product versions and cloud tenant configurations - unlike the other
- * four adapters this one could not be smoke-tested against a real instance
- * before the user provisions their TigerGraph Cloud tenant. Endpoint shapes
- * below match the documented REST++ upsert and token APIs as of this
- * writing; verify against the actual instance's API docs (linked from its
- * cloud console) and record any deviation as a methodology caveat in the
- * README, per the assignment's "honest caveats" requirement.
+ * Talks to TigerGraph Cloud (Savanna platform) over its REST++ API. TigerGraph
+ * has no official low-level Java driver, and Savanna's REST setup differs
+ * from classic TigerGraph Cloud in ways this adapter originally got wrong -
+ * fixed live against a real workspace rather than guessed:
+ *   - No custom ports (9000/14240 from classic TigerGraph): Savanna proxies
+ *     everything through standard HTTPS (443) via NGINX, path-prefixed
+ *     (/restpp/..., /gsqlserver/...) on a per-workspace hostname of the form
+ *     tg-<workspace-id>.tg-<tenant-id>.i.tgcloud.io - found via the browser's
+ *     Network tab while the Query Editor was actively using it, since it's
+ *     not surfaced anywhere in the console UI itself.
+ *   - Auth is a single header, no token-exchange call: a "Secret" generated
+ *     in Admin Portal > Management > Users is passed directly as
+ *     "Authorization: GSQL-Secret <secret>" on every request.
  *
- * Schema prerequisite (create once via the GSQL console before running the
- * benchmark): a "Page" vertex type with a primary id, and a "LINK" directed
- * edge type Page -> Page, both in the graph named by TIGERGRAPH_GRAPH.
+ * Schema prerequisite (create once via GSQL before running the benchmark,
+ * e.g. through Query Editor - requires "USE GLOBAL" first on Savanna):
+ *   USE GLOBAL
+ *   CREATE VERTEX Page (PRIMARY_ID id INT)
+ *   CREATE DIRECTED EDGE LINK (FROM Page, TO Page)
+ *   CREATE GRAPH benchmark (Page, LINK)
  */
 public final class TigerGraphPlatform implements GraphPlatform {
 
     private final String host;
-    private final String user;
-    private final String password;
+    private final String secret;
     private final String graphName;
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
-    private String token;
 
-    public TigerGraphPlatform(String host, String user, String password, String graphName) {
+    public TigerGraphPlatform(String host, String secret, String graphName) {
         this.host = host.replaceAll("/$", "");
-        this.user = user;
-        this.password = password;
+        this.secret = secret;
         this.graphName = graphName;
     }
 
@@ -60,12 +64,9 @@ public final class TigerGraphPlatform implements GraphPlatform {
     @Override
     public void connect() {
         try {
-            String body = json.writeValueAsString(Map.of("graph", graphName));
-            HttpResponse<String> resp = post(host + ":14240/requesttoken", body);
-            JsonNode node = json.readTree(resp.body());
-            token = node.path("token").asText(null);
-            if (token == null) {
-                throw new IllegalStateException("token request returned no token: " + resp.body());
+            HttpResponse<String> resp = get(host + "/restpp/echo");
+            if (resp.statusCode() != 200) {
+                throw new IllegalStateException("echo check failed (" + resp.statusCode() + "): " + resp.body());
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to connect to TigerGraph Cloud at " + host, e);
@@ -145,7 +146,7 @@ public final class TigerGraphPlatform implements GraphPlatform {
     @Override
     public boolean pointLookup(long nodeId) {
         try {
-            HttpResponse<String> resp = get(host + ":9000/restpp/graph/" + graphName +
+            HttpResponse<String> resp = get(host + "/restpp/graph/" + graphName +
                     "/vertices/Page/" + nodeId);
             return resp.statusCode() == 200;
         } catch (Exception e) {
@@ -226,7 +227,7 @@ public final class TigerGraphPlatform implements GraphPlatform {
 
     private void upsert(Map<String, Object> payload) throws Exception {
         String body = json.writeValueAsString(payload);
-        HttpResponse<String> resp = post(host + ":9000/restpp/graph/" + graphName, body);
+        HttpResponse<String> resp = post(host + "/restpp/graph/" + graphName, body);
         if (resp.statusCode() != 200) {
             throw new IllegalStateException("upsert failed (" + resp.statusCode() + "): " + resp.body());
         }
@@ -234,7 +235,7 @@ public final class TigerGraphPlatform implements GraphPlatform {
 
     private JsonNode runInterpretedGsql(String gsql, Map<String, Object> params) {
         try {
-            StringBuilder url = new StringBuilder(host + ":14240/gsqlserver/interpreted_query");
+            StringBuilder url = new StringBuilder(host + "/gsqlserver/interpreted_query");
             if (!params.isEmpty()) {
                 url.append('?');
                 boolean firstParam = true;
@@ -256,7 +257,7 @@ public final class TigerGraphPlatform implements GraphPlatform {
     private HttpResponse<String> post(String url, String body) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/json")
-                .header("Authorization", token != null ? "Bearer " + token : basicAuthHeader())
+                .header("Authorization", "GSQL-Secret " + secret)
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
         return http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -264,14 +265,9 @@ public final class TigerGraphPlatform implements GraphPlatform {
 
     private HttpResponse<String> get(String url) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .header("Authorization", token != null ? "Bearer " + token : basicAuthHeader())
+                .header("Authorization", "GSQL-Secret " + secret)
                 .GET()
                 .build();
         return http.send(request, HttpResponse.BodyHandlers.ofString());
-    }
-
-    private String basicAuthHeader() {
-        String creds = user + ":" + password;
-        return "Basic " + java.util.Base64.getEncoder().encodeToString(creds.getBytes(StandardCharsets.UTF_8));
     }
 }

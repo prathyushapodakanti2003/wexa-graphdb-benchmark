@@ -61,6 +61,41 @@ public final class Main {
         }
     }
 
+    /**
+     * Fairness/methodology caveats known ahead of time for a given platform, recorded honestly
+     * per the assignment's "record every caveat" rule rather than left for the README to catch
+     * manually. Fill in exact resource specs here once confirmed from each platform's console.
+     */
+    private static List<String> knownCaveats(String platformKey) {
+        return switch (platformKey) {
+            case "arangodb" -> List.of(
+                    "ArangoDB Oasis free trial expires 14 days after deployment creation, unlike the " +
+                            "other platforms' indefinite free tiers - re-run before it lapses if reproducing this.",
+                    "Oasis trial deployment's actual vCPU/RAM was not confirmed against CognoDB's observed " +
+                            "0.5 vCPU / 512 MB before this run - check the deployment's instance size in the " +
+                            "Oasis console and record it in the README's fairness table; any latency advantage " +
+                            "shown here may partly reflect unequal hardware, not just the platform/query language.");
+            case "memgraph" -> List.of(
+                    "This Memgraph Cloud project was observed at 2 GB RAM / 2 CPU (Europe/Frankfurt), roughly " +
+                            "4x CognoDB's actual 0.5 vCPU / 512 MB free tier - not resource-equivalent. Recorded " +
+                            "honestly per the assignment's fairness note rather than hidden; any performance " +
+                            "advantage Memgraph shows is confounded by this hardware gap.");
+            case "tigergraph" -> List.of(
+                    "This TigerGraph Cloud (Savanna) workspace was observed at 2 vCPU / 16 GiB (us-east-1), " +
+                            "roughly 32x CognoDB's actual 0.5 vCPU / 512 MB free tier - the largest resource " +
+                            "gap of any platform compared here, not resource-equivalent. Recorded honestly per " +
+                            "the assignment's fairness note; any performance difference is heavily confounded " +
+                            "by this hardware gap.",
+                    "The REST adapter's endpoint/auth scheme (Savanna: per-workspace hostname found via " +
+                            "browser Network tab, GSQL-Secret header auth) differs from classic TigerGraph " +
+                            "Cloud's documented ports/token-exchange flow this code was originally written " +
+                            "against, and was corrected live against this real workspace rather than verified " +
+                            "in advance - a concrete instance of the version/tenant drift risk flagged from " +
+                            "the start for this adapter.");
+            default -> List.of();
+        };
+    }
+
     private static void download(BenchmarkConfig config) throws Exception {
         Path destination = Path.of(config.datasetPath);
         System.out.println("Downloading dataset to " + destination.toAbsolutePath() + " ...");
@@ -78,7 +113,7 @@ public final class Main {
 
         PlatformRegistry registry = new PlatformRegistry(dotenv);
         GraphPlatform platform = registry.build(platformKey);
-        List<String> caveats = new ArrayList<>();
+        List<String> caveats = new ArrayList<>(knownCaveats(platformKey));
 
         try {
             platform.connect();

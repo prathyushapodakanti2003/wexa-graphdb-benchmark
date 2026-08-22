@@ -116,8 +116,8 @@ public final class ArangoDbPlatform implements GraphPlatform {
 
     @Override
     public long traverse(long startNodeId, int hops) {
-        String aql = "FOR v IN " + hops + ".." + hops + " OUTBOUND @start " + EDGE_COLLECTION +
-                " RETURN DISTINCT v";
+        String aql = "WITH " + VERTEX_COLLECTION + " FOR v IN " + hops + ".." + hops +
+                " OUTBOUND @start " + EDGE_COLLECTION + " RETURN DISTINCT v";
         Map<String, Object> bindVars = Map.of("start", VERTEX_COLLECTION + "/" + startNodeId);
         try (ArangoCursor<BaseDocument> cursor = db.query(aql, BaseDocument.class, bindVars)) {
             long count = 0;
@@ -126,6 +126,8 @@ public final class ArangoDbPlatform implements GraphPlatform {
                 count++;
             }
             return count;
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("traverse query failed", e);
         }
     }
 
@@ -146,6 +148,8 @@ public final class ArangoDbPlatform implements GraphPlatform {
                 count++;
             }
             return count;
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("filteredLookup query failed", e);
         }
     }
 
@@ -154,6 +158,8 @@ public final class ArangoDbPlatform implements GraphPlatform {
         try (ArangoCursor<Long> cursor = db.query(
                 "RETURN LENGTH(" + EDGE_COLLECTION + ")", Long.class)) {
             return cursor.next();
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("aggregation query failed", e);
         }
     }
 
