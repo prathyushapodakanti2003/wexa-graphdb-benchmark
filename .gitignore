@@ -1,0 +1,11 @@
+target/
+dependency-reduced-pom.xml
+.env
+data/*.csv
+data/*.zip
+results/*.json
+!results/sample/
+.idea/
+*.iml
+.vscode/
+*.log

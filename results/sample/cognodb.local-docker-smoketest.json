@@ -1,0 +1,48 @@
+{
+  "platform" : "CognoDB Cloud",
+  "queryLanguage" : "Cypher",
+  "nodeCount" : 22470,
+  "relationshipCount" : 171002,
+  "loadWallClockSeconds" : 6.1760307,
+  "nodesPerSecond" : 3638.2591168142994,
+  "relationshipsPerSecond" : 27688.01003531281,
+  "traversalLatencyMs" : {
+    "1hop" : {
+      "p50Ms" : 5.861375,
+      "p95Ms" : 11.280383,
+      "iterations" : 20
+    },
+    "2hop" : {
+      "p50Ms" : 5.672959,
+      "p95Ms" : 10.551295,
+      "iterations" : 20
+    },
+    "3hop" : {
+      "p50Ms" : 3.960831,
+      "p95Ms" : 12.050431,
+      "iterations" : 20
+    }
+  },
+  "pointLookupLatencyMs" : {
+    "p50Ms" : 4.132863,
+    "p95Ms" : 6.176767,
+    "iterations" : 20
+  },
+  "filteredLookupLatencyMs" : {
+    "p50Ms" : 4.722687,
+    "p95Ms" : 6.004735,
+    "iterations" : 20
+  },
+  "aggregationLatencyMs" : {
+    "p50Ms" : 3.194879,
+    "p95Ms" : 5.144575,
+    "iterations" : 20
+  },
+  "mixedThroughputQps" : {
+    "1" : 339.5755301872947,
+    "5" : 1507.7962121743797
+  },
+  "indexedProperties" : "Page.id (single-property index, CREATE INDEX ... FOR (p:Page) ON (p.id))",
+  "footprintNotes" : "not observable via Cypher on the free tier: stored data size and memory usage are only shown in the platform's cloud console (record manually). Queryable counts: 22470 nodes, 171002 relationships.",
+  "caveats" : [ ]
+}

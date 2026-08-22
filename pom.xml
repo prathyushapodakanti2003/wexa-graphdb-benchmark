@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>ai.wexa</groupId>
+  <artifactId>graphdb-benchmark</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <exec.mainClass>ai.wexa.benchmark.Main</exec.mainClass>
+
+    <neo4j-java-driver.version>5.28.4</neo4j-java-driver.version>
+    <arangodb-java-driver.version>7.9.0</arangodb-java-driver.version>
+    <hdrhistogram.version>2.2.2</hdrhistogram.version>
+    <jackson.version>2.18.2</jackson.version>
+    <dotenv.version>3.0.2</dotenv.version>
+    <slf4j.version>2.0.16</slf4j.version>
+  </properties>
+
+  <dependencies>
+    <!-- Official Neo4j driver: used for CognoDB, Neo4j AuraDB and Memgraph Cloud,
+         all of which speak Bolt + Cypher. -->
+    <dependency>
+      <groupId>org.neo4j.driver</groupId>
+      <artifactId>neo4j-java-driver</artifactId>
+      <version>${neo4j-java-driver.version}</version>
+    </dependency>
+
+    <!-- Official ArangoDB driver (AQL). -->
+    <dependency>
+      <groupId>com.arangodb</groupId>
+      <artifactId>arangodb-java-driver</artifactId>
+      <version>${arangodb-java-driver.version}</version>
+    </dependency>
+
+    <!-- TigerGraph has no official low-level Java driver; talked to over its
+         REST++/GSQL HTTP API using java.net.http.HttpClient (JDK built-in, no dep). -->
+
+    <!-- Percentile-accurate latency recording. -->
+    <dependency>
+      <groupId>org.hdrhistogram</groupId>
+      <artifactId>HdrHistogram</artifactId>
+      <version>${hdrhistogram.version}</version>
+    </dependency>
+
+    <!-- JSON results + REST payloads. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+
+    <!-- Reads .env for local credentials so they never live in the repo. -->
+    <dependency>
+      <groupId>io.github.cdimascio</groupId>
+      <artifactId>dotenv-java</artifactId>
+      <version>${dotenv.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>benchmark</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <mainClass>${exec.mainClass}</mainClass>
+        </configuration>
+      </plugin>
+
+      <!-- Produces a single runnable target/benchmark.jar -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${exec.mainClass}</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
